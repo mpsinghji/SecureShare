@@ -23,7 +23,7 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() }); // Keep file in memory for Supabase upload
 
 // Middleware
-if (helmet) app.use(helmet());
+if (helmet) app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173'
 }));
