@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SecureShare | Owner Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#191c1e",
+                        "inverse-primary": "#bec6e0",
+                        "on-surface-variant": "#45464d",
+                        "background": "#f7f9fb",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#76777d",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#3980f4",
+                        "tertiary-container": "#001a42",
+                        "on-secondary-container": "#57657a",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "secondary": "#515f74",
+                        "status-emerald": "#10B981",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "tertiary": "#000000",
+                        "surface-bright": "#f7f9fb",
+                        "status-critical": "#EF4444",
+                        "inverse-surface": "#2d3133",
+                        "surface-dim": "#d8dadc",
+                        "surface-container": "#eceef0",
+                        "outline-variant": "#c6c6cd",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-primary-fixed": "#131b2e",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed": "#dae2fd",
+                        "error-container": "#ffdad6",
+                        "primary": "#000000",
+                        "surface": "#f7f9fb",
+                        "border-subtle": "#E2E8F0",
+                        "on-surface": "#191c1e",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "on-error-container": "#93000a",
+                        "on-primary-container": "#7c839b",
+                        "surface-tint": "#565e74",
+                        "on-tertiary-fixed": "#001a42",
+                        "primary-fixed-dim": "#bec6e0",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "surface-container-low": "#f2f4f6",
+                        "secondary-fixed": "#d5e3fc",
+                        "secondary-container": "#d5e3fc",
+                        "status-warning": "#F59E0B",
+                        "primary-container": "#131b2e",
+                        "tertiary-fixed": "#d8e2ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "sidebar-width": "260px",
+                        "margin-desktop": "32px",
+                        "base": "4px",
+                        "max-content-width": "1200px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "code-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen pb-20 md:pb-0">
+<!-- TopAppBar from JSON -->
+<header class="w-full top-0 sticky bg-surface border-b border-outline-variant z-50 flex items-center justify-between px-margin-mobile h-16 md:px-margin-desktop">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" style="font-size: 28px;">shield</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">SecureShare</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex gap-6 mr-6">
+<a class="font-label-caps text-label-caps text-primary" href="#">Dashboard</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">Documents</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors" href="#">Activity</a>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-primary-fixed border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a corporate executive in a crisp white shirt, photographed against a minimalist grey background with clean, high-contrast studio lighting. The image conveys authority and precision, maintaining the brand's sophisticated and reliable aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXpxJ0VJCS_a6U_-8fC-u_eoVt0m8QWjTbqOqP-AkqYzYPyP1DkBMMxqONexP9fVqZ9inW8FjhMKjSypl0l1lB7opfDPnvG6T7xSrIrcF6MtapPdpIEnujtouhUaEdHyJ4ZzS-cWEgTZWhQxW0FbNlRaoSgWUbgipgtVvH4OHI1yrc7V2W52MZhl826u3fpryTcqE7o5SjwjPsGElmFzQzyU2ayJjk-qn6cJZNLvSvVOuNqkKUp52hMx5Rou5oNl1gGX0fbOkuoI0"/>
+</div>
+</div>
+</header>
+<main class="max-w-max-content-width mx-auto px-margin-mobile md:px-margin-desktop py-8">
+<!-- Welcome Header -->
+<div class="mb-8">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">Guardian Dashboard</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Monitoring 12 encrypted assets across global nodes.</p>
+</div>
+<!-- Bento Grid Stats Section -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+<!-- Stat Card: Active Links -->
+<div class="bg-surface-container-lowest border border-border-subtle p-6 rounded-xl transition-all hover:shadow-lg group">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-primary-container rounded-lg">
+<span class="material-symbols-outlined text-primary" data-icon="link">link</span>
+</div>
+<span class="text-status-emerald font-label-caps text-label-caps bg-status-emerald/10 px-2 py-1 rounded">+2 since yesterday</span>
+</div>
+<div class="font-headline-md text-headline-md text-primary mb-1">Active Links</div>
+<div class="text-4xl font-bold text-primary tracking-tight">24</div>
+<div class="mt-4 w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-3/4"></div>
+</div>
+</div>
+<!-- Stat Card: Total Views -->
+<div class="bg-surface-container-lowest border border-border-subtle p-6 rounded-xl transition-all hover:shadow-lg group">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-secondary-container rounded-lg">
+<span class="material-symbols-outlined text-secondary" data-icon="visibility">visibility</span>
+</div>
+<span class="text-on-surface-variant font-label-caps text-label-caps">This month</span>
+</div>
+<div class="font-headline-md text-headline-md text-primary mb-1">Total Views</div>
+<div class="text-4xl font-bold text-primary tracking-tight">1,284</div>
+<div class="mt-4 flex gap-1">
+<div class="h-8 w-full bg-surface-container-high rounded-sm"></div>
+<div class="h-10 w-full bg-surface-container-high rounded-sm"></div>
+<div class="h-6 w-full bg-surface-container-high rounded-sm"></div>
+<div class="h-12 w-full bg-primary rounded-sm"></div>
+<div class="h-9 w-full bg-surface-container-high rounded-sm"></div>
+</div>
+</div>
+<!-- Stat Card: Total Prints -->
+<div class="bg-surface-container-lowest border border-border-subtle p-6 rounded-xl transition-all hover:shadow-lg group">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-error-container rounded-lg">
+<span class="material-symbols-outlined text-on-error-container" data-icon="print">print</span>
+</div>
+<span class="text-status-critical font-label-caps text-label-caps bg-status-critical/10 px-2 py-1 rounded">Action Required</span>
+</div>
+<div class="font-headline-md text-headline-md text-primary mb-1">Total Prints</div>
+<div class="text-4xl font-bold text-primary tracking-tight">42</div>
+<div class="mt-4 text-body-md text-on-surface-variant">
+                    3 prints detected from unauthorized IP ranges.
+                </div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Recent Activity Feed (Wide) -->
+<div class="lg:col-span-2">
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl overflow-hidden">
+<div class="px-6 py-4 border-b border-border-subtle flex justify-between items-center bg-surface-container-low">
+<h3 class="font-headline-sm text-headline-sm text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant" style="font-size: 20px;">history</span>
+                            Recent Activity
+                        </h3>
+<button class="text-primary font-label-caps text-label-caps hover:underline">View Full Audit Log</button>
+</div>
+<div class="divide-y divide-border-subtle">
+<!-- Activity Item 1 -->
+<div class="p-6 flex items-start gap-4 hover:bg-surface-container-low transition-colors">
+<div class="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary" style="font-size: 20px;">description</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start">
+<p class="font-body-lg text-body-lg text-primary font-semibold">Q3 Financial Audit.pdf</p>
+<span class="font-code-sm text-code-sm text-on-surface-variant">2 mins ago</span>
+</div>
+<p class="text-body-md text-on-surface-variant">Viewed by <span class="text-primary font-medium">m.sterling@lawcorp.com</span> from London, UK</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-emerald"></span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">IP: 185.34.XX.XX (Verified)</span>
+</div>
+</div>
+</div>
+<!-- Activity Item 2 -->
+<div class="p-6 flex items-start gap-4 hover:bg-surface-container-low transition-colors">
+<div class="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-status-critical" style="font-size: 20px;">print</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start">
+<p class="font-body-lg text-body-lg text-primary font-semibold">Project_Ares_Manifesto.docx</p>
+<span class="font-code-sm text-code-sm text-on-surface-variant">14 mins ago</span>
+</div>
+<p class="text-body-md text-on-surface-variant">Printed by <span class="text-primary font-medium">anonymous_guest_49</span> from New York, USA</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-critical"></span>
+<span class="font-code-sm text-code-sm text-status-critical">Unauthorized Print Attempt</span>
+</div>
+</div>
+</div>
+<!-- Activity Item 3 -->
+<div class="p-6 flex items-start gap-4 hover:bg-surface-container-low transition-colors">
+<div class="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary" style="font-size: 20px;">description</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start">
+<p class="font-body-lg text-body-lg text-primary font-semibold">Merger_Agreement_Draft_v2.pdf</p>
+<span class="font-code-sm text-code-sm text-on-surface-variant">1 hour ago</span>
+</div>
+<p class="text-body-md text-on-surface-variant">Viewed by <span class="text-primary font-medium">j.doe@partner.co</span> from Tokyo, JP</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-status-emerald"></span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">IP: 203.0.XX.XX (VPN Detected)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Side Panels -->
+<div class="space-y-6">
+<!-- Quick Map Location Visual -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl overflow-hidden aspect-square relative">
+<div class="absolute inset-0 z-0 bg-surface-container-high" data-alt="A sophisticated, high-tech digital map visualization of London with glowing data nodes and sleek UI overlays. The style is minimalist with a deep navy and slate color palette, featuring thin grid lines and surgical precision. High-contrast labels and subtle neon emerald indicators signify active document access points in a modern, corporate security dashboard." data-location="London" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBGK_v873MVGc6jJgNMW9e9U7IuKGtVX9a23MYlNEzBOilmjnqXaJ2WzVzXvZWpOSbx8HxV4gyg77-42SnSqelQ10LmczihoYHuikItC8de1aeNqPelOPiTLBbuXzXhWJWx3Uht3Qnqgbsg_TZ9VThuisdnbmdrtw62E7mpuQY-YPYyh2Tzkl_HOiqJKZMqX4Kvhm5s5q1EdIXrj9LsSUy2bqE3fTaY7vSNPTEG709ksuBFf6Lma_MIe5qPatPM5EMPlQ4y_Fm0Qmc')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent z-10 pointer-events-none"></div>
+<div class="absolute bottom-4 left-4 z-20">
+<span class="font-label-caps text-label-caps text-white bg-primary/80 px-2 py-1 rounded">Live Traffic: London</span>
+</div>
+</div>
+<!-- Active Document Summary -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-6">
+<h3 class="font-headline-sm text-headline-sm text-primary mb-4">Security Health</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<span class="text-body-md text-on-surface-variant">End-to-End Encryption</span>
+<span class="text-status-emerald font-semibold">Active</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-body-md text-on-surface-variant">Data Residency</span>
+<span class="text-primary font-semibold">EU-West-1</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-body-md text-on-surface-variant">Admin Sessions</span>
+<span class="text-primary font-semibold">1 Active</span>
+</div>
+<button class="w-full mt-2 py-2 bg-primary text-white font-label-caps text-label-caps rounded-lg active:scale-95 transition-transform">Emergency Revoke All</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar from JSON (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center bg-surface border-t border-outline-variant pb-safe h-20 z-50">
+<div class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-xl px-3 py-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">description</span>
+<span class="font-label-caps text-label-caps">Documents</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-label-caps text-label-caps">Upload</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-caps text-label-caps">Activity</span>
+</div>
+</nav>
+<!-- Contextual FAB for Upload -->
+<button class="fixed right-6 bottom-24 md:bottom-12 md:right-12 w-14 h-14 bg-primary text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform hover:bg-on-background z-40">
+<span class="material-symbols-outlined" style="font-size: 32px;">add</span>
+</button>
+<script>
+        // Simple micro-interaction for cards
+        document.querySelectorAll('.grid > div').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-2px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Simulating real-time feed update
+        setInterval(() => {
+            const activities = document.querySelectorAll('.divide-y > div');
+            const lastActivity = activities[activities.length - 1];
+            // Just a visual pulse to suggest activity
+            lastActivity.classList.add('bg-primary/5');
+            setTimeout(() => lastActivity.classList.remove('bg-primary/5'), 2000);
+        }, 15000);
+    </script>
+</body></html>
