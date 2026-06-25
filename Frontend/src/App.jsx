@@ -7,7 +7,7 @@ import SecureUpload from './pages/SecureUpload';
 import SecureViewer from './pages/SecureViewer';
 import Login from './pages/Login';
 import './App.css';
-
+import './App.css';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
@@ -44,53 +44,53 @@ function App() {
     <ErrorBoundary>
       <div className="app-layout">
         {!isViewer && <TopAppBar currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} onLogout={handleLogout} />}
-        
-        <main className="main-content">
-          {renderScreen()}
-        </main>
+          
+          <main className="main-content">
+            {renderScreen()}
+          </main>
 
-        {!isViewer && <BottomNavBar currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} />}
+          {!isViewer && <BottomNavBar currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} />}
 
-        {!isViewer && currentScreen !== 'upload' && (
-          <button 
-            className="fab" 
-            onClick={() => setCurrentScreen('upload')}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>add</span>
-          </button>
-        )}
+          {!isViewer && currentScreen !== 'upload' && (
+            <button 
+              className="fab" 
+              onClick={() => setCurrentScreen('upload')}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>add</span>
+            </button>
+          )}
 
-      <style>{`
-        .app-layout {
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-        }
-        .main-content {
-          flex-grow: 1;
-        }
-        .fab {
-          position: fixed;
-          right: 24px;
-          bottom: 104px;
-          width: 56px;
-          height: 56px;
-          background-color: var(--primary);
-          color: white;
-          border-radius: var(--radius-full);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-          z-index: 40;
-          transition: transform 0.2s, background-color 0.2s;
-        }
-        .fab:hover {
-          background-color: var(--on-background);
-        }
-        .fab:active {
-          transform: scale(0.95);
-        }
+        <style>{`
+          .app-layout {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+          }
+          .main-content {
+            flex-grow: 1;
+          }
+          .fab {
+            position: fixed;
+            right: 24px;
+            bottom: 104px;
+            width: 56px;
+            height: 56px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            z-index: 40;
+            transition: transform 0.2s, background-color 0.2s;
+          }
+          .fab:hover {
+            background-color: var(--on-background);
+          }
+          .fab:active {
+            transform: scale(0.95);
+          }
         @media (min-width: 768px) {
           .fab {
             bottom: 48px;

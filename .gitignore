@@ -129,10 +129,3 @@ dist
 *.njsproj
 *.sln
 *.sw?
-
-# SecureShare specific
-test-register.js
-error.log
-*.env
-Backend/.env
-Frontend/.env

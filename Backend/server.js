@@ -8,13 +8,14 @@ import { query } from './src/db/db.js';
 import { authenticateToken } from './src/middleware/auth.js';
 import { uploadFile } from './src/services/storage.js';
 
-// Import security modules conditionally to avoid crashing if npm install isn't run yet
-let helmet, rateLimit;
+let helmet, rateLimit, OAuth2Client;
 try {
   helmet = (await import('helmet')).default;
   rateLimit = (await import('express-rate-limit')).default;
+  const { OAuth2Client: Client } = await import('google-auth-library');
+  OAuth2Client = Client;
 } catch (e) {
-  console.log("Helmet or express-rate-limit not found. Please run `npm install` in Backend directory.");
+  console.log("Optional dependencies not found. Run npm install.");
 }
 
 dotenv.config();
@@ -23,7 +24,7 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() }); // Keep file in memory for Supabase upload
 
 // Middleware
-if (helmet) app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+if (helmet) app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173'
 }));
@@ -38,31 +39,61 @@ const authLimiter = rateLimit ? rateLimit({
 
 // --- Authentication Routes ---
 
+// Helper to generate 6-digit OTP
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
 app.post('/api/auth/register', authLimiter, async (req, res, next) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
   try {
-    const existing = await query(`SELECT * FROM users WHERE email = $1`, [email]);
-    if (existing.rows.length > 0) return res.status(400).json({ error: 'Email already in use' });
+    const userExists = await query('SELECT * FROM users WHERE email = $1', [email]);
+    if (userExists.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
 
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
     
+    const otpCode = generateOTP();
+
     const newUser = await query(`
-      INSERT INTO users (email, password_hash, role) 
-      VALUES ($1, $2, 'user') 
-      RETURNING id, email, role
-    `, [email, hash]);
+      INSERT INTO users (email, password_hash, role, is_verified, otp_code) 
+      VALUES ($1, $2, 'user', false, $3) 
+      RETURNING id, email, role, is_verified
+    `, [email, hash, otpCode]);
 
     const user = newUser.rows[0];
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    
+    // Simulate sending an email
+    console.log(`\n=========================================`);
+    console.log(`[MOCK EMAIL] To: ${email}`);
+    console.log(`[MOCK EMAIL] Subject: Your SecureShare OTP`);
+    console.log(`[MOCK EMAIL] Body: Your verification code is: ${otpCode}`);
+    console.log(`=========================================\n`);
 
-    res.status(201).json({ token, user });
+    res.status(201).json({ message: 'OTP sent to email', email: user.email });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/auth/verify-otp', authLimiter, async (req, res, next) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
+
+  try {
+    const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    
+    const user = result.rows[0];
+    if (user.is_verified) return res.status(400).json({ error: 'User already verified' });
+    
+    if (user.otp_code !== otp) return res.status(400).json({ error: 'Invalid OTP' });
+    
+    await query('UPDATE users SET is_verified = true, otp_code = NULL WHERE id = $1', [user.id]);
+    
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    
+    res.json({ token, user: { id: user.id, email: user.email, role: user.role, is_verified: true } });
   } catch (error) {
     next(error);
   }
@@ -77,18 +108,76 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
     if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
 
     const user = result.rows[0];
-    const match = await bcrypt.compare(password, user.password_hash);
-    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+    const isMatch = await bcrypt.compare(password, user.password_hash);
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+    
+    // Check if user is verified
+    if (!user.is_verified) {
+      // Regenerate OTP
+      const otpCode = generateOTP();
+      await query('UPDATE users SET otp_code = $1 WHERE id = $2', [otpCode, user.id]);
+      
+      console.log(`\n=========================================`);
+      console.log(`[MOCK EMAIL] To: ${user.email}`);
+      console.log(`[MOCK EMAIL] Subject: Your SecureShare OTP (Resent)`);
+      console.log(`[MOCK EMAIL] Body: Your verification code is: ${otpCode}`);
+      console.log(`=========================================\n`);
+      
+      return res.status(403).json({ error: 'Please verify your email via OTP', requiresVerification: true, email: user.email });
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
   } catch (error) {
     next(error);
+  }
+});
+
+app.post('/api/auth/google', authLimiter, async (req, res, next) => {
+  const { credential } = req.body;
+  if (!credential) return res.status(400).json({ error: 'Missing credential' });
+
+  try {
+    if (!OAuth2Client) return res.status(500).json({ error: 'Google Auth not installed on server' });
+    
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email;
+
+    if (!email) return res.status(400).json({ error: 'Google account missing email' });
+
+    // Check if user exists
+    let result = await query('SELECT * FROM users WHERE email = $1', [email]);
+    let user;
+
+    if (result.rows.length === 0) {
+      // Auto-register verified user
+      const dummyHash = await bcrypt.hash(Math.random().toString(), 10);
+      const newUser = await query(`
+        INSERT INTO users (email, password_hash, role, is_verified) 
+        VALUES ($1, $2, 'user', true) 
+        RETURNING id, email, role, is_verified
+      `, [email, dummyHash]);
+      user = newUser.rows[0];
+    } else {
+      user = result.rows[0];
+      if (!user.is_verified) {
+        await query('UPDATE users SET is_verified = true WHERE id = $1', [user.id]);
+        user.is_verified = true;
+      }
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token, user: { id: user.id, email: user.email, role: user.role, is_verified: true } });
+  } catch (error) {
+    console.error("Google Auth Error:", error);
+    res.status(401).json({ error: 'Invalid Google Token' });
   }
 });
 
@@ -132,7 +221,7 @@ app.get('/api/dashboard/activities', authenticateToken, async (req, res) => {
       ORDER BY a.timestamp DESC
       LIMIT 10
     `);
-    
+
     res.json(activities.rows);
   } catch (error) {
     console.error("Error fetching activities:", error);
@@ -148,7 +237,7 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
       FROM documents
       ORDER BY uploaded_at DESC
     `);
-    
+
     res.json(documents.rows);
   } catch (error) {
     console.error("Error fetching documents:", error);
@@ -189,7 +278,7 @@ app.get('/api/documents/:id/view', authenticateToken, async (req, res) => {
     const docId = req.params.id;
     const userEmail = req.user.email;
     const ip = req.ip || req.connection.remoteAddress || 'Unknown';
-    
+
     // Fetch document URL
     const docQuery = await query(`SELECT * FROM documents WHERE id = $1`, [docId]);
     if (docQuery.rows.length === 0) {
@@ -236,8 +325,10 @@ app.listen(PORT, async () => {
   try {
     // 1. Alter Schema if needed
     await query('ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)');
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE'); // default true for old users
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10)');
     console.log('Database schema verified.');
-    
+
     // 2. Dummy Data Cleanup for Production Setup
     const cleanupResult = await query(`
       DELETE FROM documents 

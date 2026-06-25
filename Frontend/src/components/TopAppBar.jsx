@@ -22,8 +22,17 @@ const TopAppBar = ({ currentScreen, setCurrentScreen, onLogout }) => {
             Documents
           </button>
         </div>
-        <div className="avatar bg-primary-container">
-          <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXpxJ0VJCS_a6U_-8fC-u_eoVt0m8QWjTbqOqP-AkqYzYPyP1DkBMMxqONexP9fVqZ9inW8FjhMKjSypl0l1lB7opfDPnvG6T7xSrIrcF6MtapPdpIEnujtouhUaEdHyJ4ZzS-cWEgTZWhQxW0FbNlRaoSgWUbgipgtVvH4OHI1yrc7V2W52MZhl826u3fpryTcqE7o5SjwjPsGElmFzQzyU2ayJjk-qn6cJZNLvSvVOuNqkKUp52hMx5Rou5oNl1gGX0fbOkuoI0" alt="User Profile" />
+        <div className="flex items-center gap-3">
+          <div className="avatar bg-primary-container">
+            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXpxJ0VJCS_a6U_-8fC-u_eoVt0m8QWjTbqOqP-AkqYzYPyP1DkBMMxqONexP9fVqZ9inW8FjhMKjSypl0l1lB7opfDPnvG6T7xSrIrcF6MtapPdpIEnujtouhUaEdHyJ4ZzS-cWEgTZWhQxW0FbNlRaoSgWUbgipgtVvH4OHI1yrc7V2W52MZhl826u3fpryTcqE7o5SjwjPsGElmFzQzyU2ayJjk-qn6cJZNLvSvVOuNqkKUp52hMx5Rou5oNl1gGX0fbOkuoI0" alt="User Profile" />
+          </div>
+          <button 
+            className="icon-btn text-on-surface-variant hover-text-critical" 
+            onClick={onLogout}
+            title="Logout"
+          >
+            <span className="material-symbols-outlined">logout</span>
+          </button>
         </div>
       </div>
       <style>{`
@@ -73,6 +82,23 @@ const TopAppBar = ({ currentScreen, setCurrentScreen, onLogout }) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+        .icon-btn {
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px;
+          border-radius: var(--radius-full);
+          transition: background-color 0.2s, color 0.2s;
+        }
+        .icon-btn:hover {
+          background-color: var(--surface-container-high);
+        }
+        .hover-text-critical:hover {
+          color: var(--status-critical) !important;
         }
       `}</style>
     </header>

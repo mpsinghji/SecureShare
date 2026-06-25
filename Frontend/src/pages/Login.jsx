@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 import { showToast } from '../utils/toast';
 
 const Login = ({ setAuthToken }) => {
@@ -10,6 +11,11 @@ const Login = ({ setAuthToken }) => {
   
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
+
+  // OTP State
+  const [requiresOtp, setRequiresOtp] = useState(false);
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,9 +39,15 @@ const Login = ({ setAuthToken }) => {
         setAuthToken(data.token);
         showToast('Login successful', 'success');
       } else {
-        const errorMsg = data.error || 'Login failed';
-        setError(errorMsg);
-        showToast(errorMsg, 'error');
+        if (data.requiresVerification) {
+          setRequiresOtp(true);
+          setOtpEmail(data.email);
+          showToast('Please check your email for the OTP', 'success');
+        } else {
+          const errorMsg = data.error || 'Login failed';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -62,9 +74,9 @@ const Login = ({ setAuthToken }) => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('secureshare_token', data.token);
-        setAuthToken(data.token);
-        showToast('Registration successful', 'success');
+        setRequiresOtp(true);
+        setOtpEmail(data.email);
+        showToast('Registration successful! Please verify OTP', 'success');
       } else {
         const errorMsg = data.error || 'Registration failed';
         setError(errorMsg);
@@ -78,6 +90,106 @@ const Login = ({ setAuthToken }) => {
       setLoading(false);
     }
   };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: otpEmail, otp: otpCode })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('secureshare_token', data.token);
+        setAuthToken(data.token);
+        showToast('Email verified successfully', 'success');
+      } else {
+        const errorMsg = data.error || 'Verification failed';
+        setError(errorMsg);
+        showToast(errorMsg, 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Network error. Please try again.');
+      showToast('Network error.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        localStorage.setItem('secureshare_token', data.token);
+        setAuthToken(data.token);
+        showToast('Google Sign-In successful', 'success');
+      } else {
+        setError(data.error || 'Google Sign-In failed');
+        showToast(data.error || 'Google Sign-In failed', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Network error during Google Sign-In.');
+      showToast('Network error.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (requiresOtp) {
+    return (
+      <div className="login-wrapper">
+        <div className="container" style={{ width: '400px', minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+          <span className="material-symbols-outlined text-primary mb-4" style={{ fontSize: '48px' }}>mark_email_unread</span>
+          <h1 className="font-headline-md text-primary mb-2">Verify Your Email</h1>
+          <p className="font-body-sm text-on-surface-variant mb-6 text-center">We've sent a 6-digit code to <strong>{otpEmail}</strong></p>
+          
+          <form onSubmit={handleVerifyOtp} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="input-group">
+              <span className="material-symbols-outlined icon">password</span>
+              <input 
+                type="text" 
+                placeholder="Enter 6-digit OTP" 
+                className="custom-input text-center"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                maxLength="6"
+                required
+                style={{ letterSpacing: '8px', fontSize: '18px', fontWeight: 'bold' }}
+              />
+            </div>
+
+            {error && (
+              <div className="error-banner font-body-sm">
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>error</span>
+                {error}
+              </div>
+            )}
+
+            <button type="submit" className="action-btn" style={{ width: '100%' }} disabled={loading}>
+              {loading ? 'Verifying...' : 'Verify Email'}
+            </button>
+            <button type="button" className="ghost-btn" style={{ marginTop: '16px', color: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={() => setRequiresOtp(false)}>Back to Login</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="login-wrapper">
@@ -123,6 +235,15 @@ const Login = ({ setAuthToken }) => {
             <button type="submit" className="action-btn" disabled={loading}>
               {loading ? 'Initializing...' : 'Sign Up'}
             </button>
+            <div style={{ marginTop: '20px', width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => {
+                  setError('Google Sign-In Failed');
+                  showToast('Google Sign-In Failed', 'error');
+                }}
+              />
+            </div>
           </form>
         </div>
 
@@ -166,6 +287,15 @@ const Login = ({ setAuthToken }) => {
             <button type="submit" className="action-btn" disabled={loading}>
               {loading ? 'Authenticating...' : 'Sign In'}
             </button>
+            <div style={{ marginTop: '20px', width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => {
+                  setError('Google Sign-In Failed');
+                  showToast('Google Sign-In Failed', 'error');
+                }}
+              />
+            </div>
           </form>
         </div>
 
