@@ -43,7 +43,7 @@ function App() {
   return (
     <ErrorBoundary>
       <div className="app-layout">
-        {!isViewer && <TopAppBar currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} onLogout={handleLogout} />}
+        {!isViewer && <TopAppBar authToken={authToken} currentScreen={currentScreen} setCurrentScreen={setCurrentScreen} onLogout={handleLogout} />}
           
           <main className="main-content">
             {renderScreen()}

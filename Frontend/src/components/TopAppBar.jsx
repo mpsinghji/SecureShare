@@ -1,6 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import ProfileModal from './ProfileModal';
 
-const TopAppBar = ({ currentScreen, setCurrentScreen, onLogout }) => {
+const AVATAR_STYLES = [
+  { id: 'boy', getUrl: (name) => `https://avatar.iran.liara.run/public/boy?username=${encodeURIComponent(name)}` },
+  { id: 'girl', getUrl: (name) => `https://avatar.iran.liara.run/public/girl?username=${encodeURIComponent(name)}` },
+  { id: 'initials', getUrl: (name) => `https://avatar.iran.liara.run/username?username=${encodeURIComponent(name)}` },
+  { id: 'anonymous', getUrl: () => `https://lh3.googleusercontent.com/aida-public/AB6AXuCXpxJ0VJCS_a6U_-8fC-u_eoVt0m8QWjTbqOqP-AkqYzYPyP1DkBMMxqONexP9fVqZ9inW8FjhMKjSypl0l1lB7opfDPnvG6T7xSrIrcF6MtapPdpIEnujtouhUaEdHyJ4ZzS-cWEgTZWhQxW0FbNlRaoSgWUbgipgtVvH4OHI1yrc7V2W52MZhl826u3fpryTcqE7o5SjwjPsGElmFzQzyU2ayJjk-qn6cJZNLvSvVOuNqkKUp52hMx5Rou5oNl1gGX0fbOkuoI0` }
+];
+
+const TopAppBar = ({ authToken, currentScreen, setCurrentScreen, onLogout }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(AVATAR_STYLES[3].getUrl());
+  
+  const loadProfile = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/user/profile`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const style = AVATAR_STYLES.find(s => s.id === data.avatar_style) || AVATAR_STYLES[3];
+        setAvatarUrl(style.getUrl(data.username || data.email));
+      }
+    } catch (err) {
+      console.error("Failed to load header profile", err);
+    }
+  };
+
+  useEffect(() => {
+    if (authToken) loadProfile();
+  }, [authToken]);
+
   return (
     <header className="top-app-bar">
       <div className="flex items-center gap-3">
@@ -23,8 +54,8 @@ const TopAppBar = ({ currentScreen, setCurrentScreen, onLogout }) => {
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <div className="avatar bg-primary-container">
-            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXpxJ0VJCS_a6U_-8fC-u_eoVt0m8QWjTbqOqP-AkqYzYPyP1DkBMMxqONexP9fVqZ9inW8FjhMKjSypl0l1lB7opfDPnvG6T7xSrIrcF6MtapPdpIEnujtouhUaEdHyJ4ZzS-cWEgTZWhQxW0FbNlRaoSgWUbgipgtVvH4OHI1yrc7V2W52MZhl826u3fpryTcqE7o5SjwjPsGElmFzQzyU2ayJjk-qn6cJZNLvSvVOuNqkKUp52hMx5Rou5oNl1gGX0fbOkuoI0" alt="User Profile" />
+          <div className="avatar bg-primary-container" onClick={() => setIsModalOpen(true)} title="Edit Profile">
+            <img src={avatarUrl} alt="User Profile" />
           </div>
           <button 
             className="icon-btn text-on-surface-variant hover-text-critical" 
@@ -77,6 +108,12 @@ const TopAppBar = ({ currentScreen, setCurrentScreen, onLogout }) => {
           justify-content: center;
           overflow: hidden;
           border: 1px solid var(--outline-variant);
+          cursor: pointer;
+          transition: border-color 0.2s, transform 0.2s;
+        }
+        .avatar:hover {
+          border-color: var(--primary);
+          transform: scale(1.05);
         }
         .avatar img {
           width: 100%;
@@ -101,6 +138,12 @@ const TopAppBar = ({ currentScreen, setCurrentScreen, onLogout }) => {
           color: var(--status-critical) !important;
         }
       `}</style>
+      <ProfileModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        authToken={authToken}
+        onProfileUpdate={loadProfile}
+      />
     </header>
   );
 };

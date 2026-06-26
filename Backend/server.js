@@ -229,6 +229,29 @@ app.get('/api/dashboard/activities', authenticateToken, async (req, res) => {
   }
 });
 
+// Profile Routes
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
+  try {
+    const result = await query('SELECT email, role, is_verified, username, avatar_style FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.put('/api/user/profile', authenticateToken, async (req, res) => {
+  const { username, avatar_style } = req.body;
+  try {
+    await query('UPDATE users SET username = $1, avatar_style = $2 WHERE id = $3', [username, avatar_style, req.user.id]);
+    res.json({ message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // Get Documents List
 app.get('/api/documents', authenticateToken, async (req, res) => {
   try {
@@ -268,7 +291,7 @@ app.post('/api/documents', authenticateToken, upload.single('file'), async (req,
     });
   } catch (error) {
     console.error("Error uploading document:", error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -327,6 +350,8 @@ app.listen(PORT, async () => {
     await query('ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)');
     await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE'); // default true for old users
     await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10)');
+    await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(50)');
+    await query("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_style VARCHAR(20) DEFAULT 'anonymous'");
     console.log('Database schema verified.');
 
     // 2. Dummy Data Cleanup for Production Setup

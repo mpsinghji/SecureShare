@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const bucketName = process.env.SUPABASE_BUCKET || 'secureshare-docs';
 
 const supabase = createClient(supabaseUrl, supabaseKey, {
