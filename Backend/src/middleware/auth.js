@@ -35,3 +35,34 @@ export const authenticateToken = (req, res, next) => {
     }
   });
 };
+
+export const optionalAuthenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
+    if (err) {
+      req.user = null;
+      return next();
+    }
+    
+    try {
+      const dbUser = await query('SELECT is_blocked FROM users WHERE id = $1', [user.id]);
+      if (dbUser.rows.length === 0 || dbUser.rows[0].is_blocked) {
+        req.user = null;
+        return next();
+      }
+      req.user = user;
+      next();
+    } catch (dbErr) {
+      console.error('Auth DB Error:', dbErr);
+      req.user = null;
+      next();
+    }
+  });
+};

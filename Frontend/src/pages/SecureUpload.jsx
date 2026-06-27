@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { showToast } from '../utils/toast';
 
 const SecureUpload = ({ authToken, setCurrentScreen }) => {
@@ -15,7 +15,61 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
 
+  // Admin email suggestions
+  const [allUsers, setAllUsers] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionQuery, setSuggestionQuery] = useState('');
+  const suggestionsRef = useRef(null);
+
+  // Decode JWT to check if admin
+  const decodeToken = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) { return null; }
+  };
+  const user = decodeToken(authToken);
+  const isAdmin = user?.email === 'admin@secureshare.com';
+
   const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+  // Auto-reset deleteOnExpiry when switching to "never"
+  useEffect(() => {
+    if (expiry === 'never') {
+      setDeleteOnExpiry(false);
+    }
+  }, [expiry]);
+
+  // Fetch users for admin suggestions (lazy, once)
+  useEffect(() => {
+    if (isAdmin && shareMode === 'users' && allUsers.length === 0) {
+      const fetchUsers = async () => {
+        try {
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const res = await fetch(`${API_URL}/api/admin/users`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+          if (res.ok) {
+            const users = await res.json();
+            setAllUsers(users);
+          }
+        } catch (e) {
+          console.error('Failed to fetch users for suggestions', e);
+        }
+      };
+      fetchUsers();
+    }
+  }, [isAdmin, shareMode]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   const formatFileSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
@@ -61,6 +115,41 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
     e.stopPropagation();
     setDragActive(false);
   };
+
+  // Get the "last segment" being typed for suggestion matching
+  const getLastSegment = (text) => {
+    const parts = text.split(',');
+    return parts[parts.length - 1].trim();
+  };
+
+  const handleSharedUsersChange = (e) => {
+    const val = e.target.value;
+    setSharedUsers(val);
+    const lastSeg = getLastSegment(val);
+    setSuggestionQuery(lastSeg);
+    setShowSuggestions(lastSeg.length > 0);
+  };
+
+  const handleSelectSuggestion = (username) => {
+    const parts = sharedUsers.split(',').map(s => s.trim()).filter(s => s);
+    // Replace the last partially-typed segment
+    if (parts.length > 0) {
+      parts[parts.length - 1] = username;
+    } else {
+      parts.push(username);
+    }
+    setSharedUsers(parts.join(', ') + ', ');
+    setShowSuggestions(false);
+    setSuggestionQuery('');
+  };
+
+  const filteredSuggestions = allUsers.filter(u => {
+    const q = suggestionQuery.toLowerCase();
+    if (!q) return false;
+    const alreadyAdded = sharedUsers.split(',').map(s => s.trim().toLowerCase());
+    if (alreadyAdded.includes(u.username?.toLowerCase())) return false;
+    return u.username?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+  }).slice(0, 6); // Max 6 suggestions
 
   const handleUpload = async () => {
     if (!file) return;
@@ -167,19 +256,38 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
                 <select 
                   value={shareMode} 
                   onChange={(e) => setShareMode(e.target.value)}
-                  className="bg-surface-container border border-outline-variant rounded-md p-2 text-on-surface w-full mb-3"
+                  className="styled-select w-full mb-3"
                 >
                   <option value="public">Public Link</option>
                   <option value="users">Specific SecureShare Users</option>
                 </select>
                 {shareMode === 'users' && (
-                  <input 
-                    type="text"
-                    placeholder="Enter usernames (comma separated)"
-                    value={sharedUsers}
-                    onChange={(e) => setSharedUsers(e.target.value)}
-                    className="bg-surface-container border border-outline-variant rounded-md p-2 text-on-surface w-full"
-                  />
+                  <div className="relative" ref={suggestionsRef}>
+                    <input 
+                      type="text"
+                      placeholder="Enter usernames (comma separated)"
+                      value={sharedUsers}
+                      onChange={handleSharedUsersChange}
+                      onFocus={() => { if (suggestionQuery) setShowSuggestions(true); }}
+                      className="styled-input w-full"
+                    />
+                    {/* Admin email suggestions dropdown */}
+                    {isAdmin && showSuggestions && filteredSuggestions.length > 0 && (
+                      <div className="suggestions-dropdown">
+                        {filteredSuggestions.map(u => (
+                          <button
+                            key={u.id}
+                            className="suggestion-item"
+                            onClick={() => handleSelectSuggestion(u.username)}
+                            type="button"
+                          >
+                            <div className="suggestion-main">@{u.username}</div>
+                            <div className="suggestion-sub">{u.email}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -188,7 +296,7 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
                 <select 
                   value={expiry} 
                   onChange={(e) => setExpiry(e.target.value)}
-                  className="bg-surface-container border border-outline-variant rounded-md p-2 text-on-surface w-full mb-3"
+                  className="styled-select w-full mb-3"
                 >
                   <option value="never">Never (Keep Forever)</option>
                   <option value="1h">1 Hour</option>
@@ -222,10 +330,19 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
               <div className="toggle-row">
                 <div className="text-left">
                   <h4 className="font-label-caps text-on-surface mb-1">Delete Permanently</h4>
-                  <p className="font-body-sm text-on-surface-variant">Instead of just revoking access, erase file when expired.</p>
+                  <p className="font-body-sm text-on-surface-variant">
+                    {expiry === 'never' 
+                      ? 'Set an expiry timer first to enable this option.' 
+                      : 'Instead of just revoking access, erase file when expired.'}
+                  </p>
                 </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" checked={deleteOnExpiry} onChange={(e) => setDeleteOnExpiry(e.target.checked)} disabled={expiry === 'never'} />
+                <label className={`toggle-switch ${expiry === 'never' ? 'toggle-disabled' : ''}`}>
+                  <input 
+                    type="checkbox" 
+                    checked={deleteOnExpiry} 
+                    onChange={(e) => setDeleteOnExpiry(e.target.checked)} 
+                    disabled={expiry === 'never'} 
+                  />
                   <span className="slider"></span>
                 </label>
               </div>
@@ -357,6 +474,94 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
           border-radius: var(--radius-lg);
           padding: 20px;
         }
+
+        /* Styled Select */
+        .styled-select {
+          appearance: none;
+          -webkit-appearance: none;
+          background-color: var(--surface-container);
+          border: 1px solid var(--outline-variant);
+          border-radius: var(--radius-md);
+          padding: 10px 36px 10px 12px;
+          color: var(--on-surface);
+          font-family: var(--font-inter);
+          font-size: 13px;
+          cursor: pointer;
+          outline: none;
+          transition: border-color 0.2s, background-color 0.2s;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%2345464d'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 10px center;
+        }
+        .styled-select:hover {
+          border-color: var(--primary);
+        }
+        .styled-select:focus {
+          border-color: var(--primary);
+          background-color: var(--surface-container-lowest);
+        }
+
+        /* Styled Input */
+        .styled-input {
+          background-color: var(--surface-container);
+          border: 1px solid var(--outline-variant);
+          border-radius: var(--radius-md);
+          padding: 10px 12px;
+          color: var(--on-surface);
+          font-family: var(--font-inter);
+          font-size: 13px;
+          outline: none;
+          transition: border-color 0.2s, background-color 0.2s;
+        }
+        .styled-input:focus {
+          border-color: var(--primary);
+          background-color: var(--surface-container-lowest);
+        }
+
+        /* Suggestions dropdown */
+        .suggestions-dropdown {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          background-color: var(--surface-container-lowest);
+          border: 1px solid var(--outline-variant);
+          border-radius: var(--radius-md);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+          z-index: 100;
+          overflow: hidden;
+          animation: suggestionSlide 0.15s ease-out;
+        }
+        @keyframes suggestionSlide {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .suggestion-item {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          width: 100%;
+          padding: 10px 14px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          transition: background-color 0.15s;
+          font-family: var(--font-inter);
+        }
+        .suggestion-item:hover {
+          background-color: var(--surface-container-high);
+        }
+        .suggestion-main {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--on-surface);
+        }
+        .suggestion-sub {
+          font-size: 11px;
+          color: var(--on-surface-variant);
+          margin-top: 2px;
+        }
+
         .toggles-container {
           display: flex;
           flex-direction: column;
@@ -408,7 +613,10 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
           transform: translateX(22px);
           background-color: var(--on-primary);
         }
-        .toggle-switch input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+        .toggle-disabled .slider { 
+          opacity: 0.35; 
+          cursor: not-allowed; 
+        }
         
         /* 3D Date Picker */
         .date-picker-3d {
@@ -438,10 +646,10 @@ const SecureUpload = ({ authToken, setCurrentScreen }) => {
         .p-2 { padding: 8px; }
         .mb-3 { margin-bottom: 12px; }
         .mt-2 { margin-top: 8px; }
+        .relative { position: relative; }
       `}</style>
     </div>
   );
 };
 
 export default SecureUpload;
-

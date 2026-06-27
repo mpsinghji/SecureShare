@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { query } from './src/db/db.js';
-import { authenticateToken } from './src/middleware/auth.js';
+import { authenticateToken, optionalAuthenticateToken } from './src/middleware/auth.js';
 import { uploadFile, deleteFile } from './src/services/storage.js';
 
 let helmet, rateLimit, OAuth2Client;
@@ -469,10 +469,10 @@ app.post('/api/documents', authenticateToken, upload.single('file'), async (req,
 });
 
 // View Document (Log activity and return URL)
-app.get('/api/documents/:id/view', authenticateToken, async (req, res) => {
+app.get('/api/documents/:id/view', optionalAuthenticateToken, async (req, res) => {
   try {
     const docId = req.params.id;
-    const userEmail = req.user.email;
+    const userEmail = req.user ? req.user.email : 'Anonymous';
     const ip = req.ip || req.connection?.remoteAddress || 'Unknown';
 
     // Fetch document URL
@@ -482,15 +482,23 @@ app.get('/api/documents/:id/view', authenticateToken, async (req, res) => {
     }
     const doc = docResult.rows[0];
 
-    // Check Isolation (Owner OR Shared User)
-    const userResult = await query('SELECT username FROM users WHERE email = $1', [userEmail]);
-    const username = userResult.rows[0]?.username || '';
-    
-    const isOwner = doc.user_email === userEmail;
-    const isShared = doc.shared_with_usernames && doc.shared_with_usernames.includes(username);
     const isPublic = !doc.shared_with_usernames || doc.shared_with_usernames.length === 0;
+
+    if (!req.user && !isPublic) {
+      return res.status(401).json({ error: 'Please log in to view this secure document.' });
+    }
+
+    let isOwner = false;
+    let isShared = false;
+
+    if (req.user) {
+      const userResult = await query('SELECT username FROM users WHERE email = $1', [userEmail]);
+      const username = userResult.rows[0]?.username || '';
+      isOwner = doc.user_email === userEmail;
+      isShared = doc.shared_with_usernames && (doc.shared_with_usernames.includes(username) || doc.shared_with_usernames.includes(userEmail));
+    }
     
-    if (!isOwner && !isShared && !isPublic) {
+    if (req.user && !isOwner && !isShared && !isPublic) {
       return res.status(403).json({ error: 'You do not have permission to view this document.' });
     }
 
@@ -540,6 +548,17 @@ app.get('/api/documents/:id/view', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/documents/:id/allow_print', authenticateToken, async (req, res) => {
+  const { allow_print } = req.body;
+  try {
+    const docQuery = await query('SELECT * FROM documents WHERE id = $1 AND user_email = $2', [req.params.id, req.user.email]);
+    if (docQuery.rows.length === 0) return res.status(403).json({ error: 'Unauthorized or not found' });
+    
+    await query('UPDATE documents SET allow_print = $1 WHERE id = $2', [allow_print === true || allow_print === 'true', req.params.id]);
+    res.json({ message: 'Print access updated' });
+  } catch (error) { res.status(500).json({ error: 'Server error' }); }
+});
+
 app.put('/api/documents/:id/expiry', authenticateToken, async (req, res) => {
   const { expires_at } = req.body;
   try {
@@ -550,6 +569,17 @@ app.put('/api/documents/:id/expiry', authenticateToken, async (req, res) => {
     await query('UPDATE documents SET expires_at = $1, status = $2 WHERE id = $3', 
       [expires_at || null, isExpiredNow ? 'revoked' : 'active', req.params.id]);
     res.json({ message: 'Expiry updated' });
+  } catch (error) { res.status(500).json({ error: 'Server error' }); }
+});
+
+app.put('/api/documents/:id/sharing', authenticateToken, async (req, res) => {
+  const { shared_with_usernames } = req.body;
+  try {
+    const docQuery = await query('SELECT * FROM documents WHERE id = $1 AND user_email = $2', [req.params.id, req.user.email]);
+    if (docQuery.rows.length === 0) return res.status(403).json({ error: 'Unauthorized or not found' });
+    
+    await query('UPDATE documents SET shared_with_usernames = $1 WHERE id = $2', [shared_with_usernames, req.params.id]);
+    res.json({ message: 'Access updated' });
   } catch (error) { res.status(500).json({ error: 'Server error' }); }
 });
 

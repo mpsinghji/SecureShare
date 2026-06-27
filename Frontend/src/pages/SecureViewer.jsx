@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import { showToast } from '../utils/toast';
 import * as XLSX from 'xlsx';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -14,6 +15,7 @@ const SecureViewer = ({ authToken, document, onClose }) => {
   const [pageNumber, setPageNumber] = useState(1);
   const [excelData, setExcelData] = useState(null);
   
+  const [fullDoc, setFullDoc] = useState(document);
   // Security States
   const [isHidden, setIsHidden] = useState(false);
 
@@ -23,12 +25,15 @@ const SecureViewer = ({ authToken, document, onClose }) => {
     const fetchDocumentUrl = async () => {
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const headers = {};
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
         const response = await fetch(`${API_URL}/api/documents/${document.id}/view`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers
         });
         if (response.ok) {
           const data = await response.json();
           setDocUrl(data.url);
+          if (data.document) setFullDoc(data.document);
         } else {
           const errData = await response.json().catch(() => ({}));
           setError(errData.error || 'Failed to fetch document');
@@ -45,8 +50,8 @@ const SecureViewer = ({ authToken, document, onClose }) => {
   }, [document, authToken]);
 
   useEffect(() => {
-    if (!docUrl) return;
-    const ext = document?.name?.split('.').pop().toLowerCase();
+    if (!docUrl || !fullDoc) return;
+    const ext = fullDoc?.name?.split('.').pop().toLowerCase();
     if (ext === 'xlsx' || ext === 'xls') {
       const loadExcel = async () => {
         try {
@@ -115,8 +120,16 @@ const SecureViewer = ({ authToken, document, onClose }) => {
       }
     };
     
-    const handleVisibilityChange = () => setIsHidden(window.document.hidden);
-    const handleBlur = () => setIsHidden(true); // Hide when window loses focus (e.g. Snipping Tool activated)
+    const handleVisibilityChange = () => {
+      if (!window.document.body.classList.contains('allow-print')) {
+        setIsHidden(window.document.hidden);
+      }
+    };
+    const handleBlur = () => {
+      if (!window.document.body.classList.contains('allow-print')) {
+        setIsHidden(true); // Hide when window loses focus (e.g. Snipping Tool activated)
+      }
+    };
     const handleFocus = () => setIsHidden(false);
 
     window.addEventListener('contextmenu', handleContextMenu);
@@ -135,38 +148,59 @@ const SecureViewer = ({ authToken, document, onClose }) => {
   }, []);
 
   const handleSecurePrint = () => {
-    // Temporarily inject a style to allow printing this specific canvas
-    const style = window.document.createElement('style');
-    style.innerHTML = '@media print { body { display: block !important; background: white; } .viewer-header, .watermark { display: none !important; } .viewer-canvas { padding: 0; } }';
-    window.document.head.appendChild(style);
+    // IMPORTANT: use window.document.body — 'document' here is the file prop, NOT the DOM
+    window.document.body.classList.add('allow-print');
     
+    // Call print synchronously to avoid popup blockers
     window.print();
     
-    // Remove it immediately after
-    setTimeout(() => {
-      window.document.head.removeChild(style);
-    }, 500);
+    const cleanup = () => {
+      window.document.body.classList.remove('allow-print');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    
+    window.addEventListener('afterprint', cleanup);
+    // Fallback in case afterprint doesn't fire
+    setTimeout(cleanup, 10000);
   };
 
-  if (!document) return <div className="p-8 text-on-surface">No document selected.</div>;
+  const handleShareLink = () => {
+    const link = `${window.location.origin}/view/${document.id}`;
+    navigator.clipboard.writeText(link).then(() => {
+      showToast('Share link copied to clipboard!', 'success');
+    }).catch(() => {
+      showToast('Failed to copy link', 'error');
+    });
+  };
+
+  if (!document && !fullDoc) return <div className="p-8 text-on-surface">No document selected.</div>;
+
+  const ext = fullDoc?.name?.split('.').pop().toLowerCase();
+  const isMedia = ['png', 'jpg', 'jpeg', 'mp4', 'mov'].includes(ext);
 
   return (
     <div className="viewer-container">
       <div className="viewer-header">
         <h2 className="font-headline-md text-on-surface flex items-center gap-2">
           <span className="material-symbols-outlined text-primary">lock</span>
-          Viewing: {document.name}
+          Viewing: {fullDoc?.name || 'Loading...'}
         </h2>
         <div className="flex gap-4">
-          {document.allow_print && (
+          {fullDoc?.allow_print && (
             <button className="secondary-btn flex items-center gap-2 font-label-caps" onClick={handleSecurePrint} title="Secure Print">
               <span className="material-symbols-outlined" style={{fontSize: '18px'}}>print</span>
               Print Securely
             </button>
           )}
-          <button className="icon-btn" onClick={onClose} title="Close">
-            <span className="material-symbols-outlined">close</span>
-          </button>
+          {!authToken ? (
+            <button className="primary-btn font-label-caps" onClick={() => window.location.href = '/'}>
+              Log In
+            </button>
+          ) : (
+            <button className="icon-btn" onClick={onClose} title="Close">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          )}
         </div>
       </div>
       
@@ -178,7 +212,7 @@ const SecureViewer = ({ authToken, document, onClose }) => {
           </div>
         )}
         
-        <div className={`pdf-page ${isHidden ? 'blur-content' : ''} ${document?.name?.match(/\\.(png|jpg|jpeg|mp4|mov)$/i) ? 'media-page' : ''}`}>
+        <div className={`pdf-page ${isHidden ? 'blur-content' : ''} ${isMedia ? 'media-page' : ''}`}>
           <div className="watermark">CONFIDENTIAL</div>
           {loading && <div className="content-placeholder"><p className="mt-4 font-body-lg text-on-surface-variant">Loading document securely...</p></div>}
           {error && <div className="content-placeholder"><p className="mt-4 font-body-lg text-status-critical">{error}</p></div>}
@@ -186,7 +220,6 @@ const SecureViewer = ({ authToken, document, onClose }) => {
           {!loading && !error && docUrl && (
             <div className="secure-renderer">
               {(() => {
-                const ext = document?.name?.split('.').pop().toLowerCase();
                 if (ext === 'pdf') {
                   return (
                     <div className="flex flex-col items-center">
@@ -257,24 +290,27 @@ const SecureViewer = ({ authToken, document, onClose }) => {
           flex-grow: 1;
           display: flex;
           justify-content: center;
-          padding: 24px;
+          align-items: flex-start;
+          padding: 32px;
           overflow-y: auto;
           width: 100%;
         }
         .pdf-page {
-          width: 100%;
-          max-width: 1200px;
-          min-height: 100%;
-          background-color: white;
-          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
-          position: relative;
-          display: flex;
+          display: inline-flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
+          background-color: white;
+          box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+          position: relative;
+          padding: 24px;
+          border-radius: 4px;
+          min-width: 300px;
         }
         .media-page {
           background-color: transparent !important;
           box-shadow: none !important;
+          padding: 0 !important;
         }
         .watermark {
           position: absolute;
@@ -315,7 +351,7 @@ const SecureViewer = ({ authToken, document, onClose }) => {
         }
 
         .secure-renderer {
-          width: 100%;
+          width: auto;
           display: flex;
           justify-content: center;
           z-index: 1;
@@ -329,6 +365,10 @@ const SecureViewer = ({ authToken, document, onClose }) => {
           background-color: var(--surface-container-high);
           padding: 8px 16px;
           border-radius: var(--radius-sm);
+          transition: background-color 0.2s;
+        }
+        .secondary-btn:hover {
+          background-color: var(--surface-container-highest);
         }
         .secondary-btn:disabled { opacity: 0.5; }
         
@@ -375,7 +415,30 @@ const SecureViewer = ({ authToken, document, onClose }) => {
         }
         
         @media print {
-          body { display: none !important; }
+          body:not(.allow-print) { display: none !important; }
+          body.allow-print, body.allow-print #root, body.allow-print .viewer-container { 
+            height: auto !important; 
+            overflow: visible !important; 
+            display: block !important; 
+            background: white !important;
+          }
+          body.allow-print .viewer-header, body.allow-print .watermark, body.allow-print .pdf-controls { 
+            display: none !important; 
+          }
+          body.allow-print .viewer-canvas { 
+            padding: 0 !important; 
+            overflow: visible !important; 
+            height: auto !important; 
+            display: block !important; 
+          }
+          body.allow-print .pdf-page { 
+            box-shadow: none !important; 
+            display: block !important; 
+            width: auto !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
         }
       `}</style>
     </div>
