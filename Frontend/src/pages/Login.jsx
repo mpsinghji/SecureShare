@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { showToast } from '../utils/toast';
+import './Login.css';
 
 const Login = ({ setAuthToken }) => {
   const [isRightPanelActive, setIsRightPanelActive] = useState(false);
@@ -12,10 +13,16 @@ const Login = ({ setAuthToken }) => {
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
 
-  // OTP State
   const [requiresOtp, setRequiresOtp] = useState(false);
   const [otpEmail, setOtpEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
+
+  // Forgot Password State
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetStep, setResetStep] = useState(1);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -151,41 +158,138 @@ const Login = ({ setAuthToken }) => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/forgot-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResetStep(2);
+        showToast('Reset code sent to your email', 'success');
+      } else {
+        setError(data.error || 'Failed to send reset code');
+      }
+    } catch (err) {
+      setError('Network error');
+    } finally { setLoading(false); }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/reset-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail, otp: resetOtp, newPassword })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setIsForgotPassword(false);
+        setResetStep(1);
+        showToast('Password reset successfully! You can now log in.', 'success');
+      } else {
+        setError(data.error || 'Failed to reset password');
+      }
+    } catch (err) {
+      setError('Network error');
+    } finally { setLoading(false); }
+  };
+
+  if (isForgotPassword) {
+    return (
+      <div className="login-wrapper">
+        <div className="verify-container" style={{ width: '450px', backgroundColor: 'var(--surface-container-lowest)', borderRadius: '24px', padding: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ backgroundColor: 'var(--primary-container)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
+            <span className="material-symbols-outlined text-primary" style={{ fontSize: '40px' }}>lock_reset</span>
+          </div>
+          <h1 className="font-headline-lg text-primary mb-2 text-center">Reset Password</h1>
+          
+          {resetStep === 1 ? (
+            <>
+              <p className="font-body-md text-on-surface-variant mb-8 text-center" style={{ lineHeight: '1.5' }}>
+                Enter your email address and we'll send you a recovery code.
+              </p>
+              <form onSubmit={handleForgotPassword} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div className="input-group" style={{ marginBottom: '24px' }}>
+                  <input type="email" placeholder="Email Address" className="custom-input" value={forgotPasswordEmail} onChange={(e) => setForgotPasswordEmail(e.target.value)} required />
+                </div>
+                {error && <div className="error-banner font-body-sm mb-6" style={{ marginTop: 0 }}><span className="material-symbols-outlined">error</span>{error}</div>}
+                <button type="submit" className="action-btn" style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px' }} disabled={loading}>{loading ? 'Sending...' : 'Send Reset Code'}</button>
+                <button type="button" className="ghost-btn" style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px', border: 'none', color: 'var(--primary)', marginTop: '8px' }} onClick={() => setIsForgotPassword(false)}>Back to Login</button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="font-body-md text-on-surface-variant mb-8 text-center" style={{ lineHeight: '1.5' }}>
+                Enter the 6-digit code sent to <strong className="text-on-surface">{forgotPasswordEmail}</strong> and your new password.
+              </p>
+              <form onSubmit={handleResetPassword} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div className="input-group" style={{ marginBottom: '16px' }}>
+                  <input type="text" placeholder="000000" className="custom-input text-center" value={resetOtp} onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ''))} maxLength="6" required style={{ letterSpacing: '8px', fontSize: '20px', fontWeight: 'bold' }} />
+                </div>
+                <div className="input-group" style={{ marginBottom: '24px' }}>
+                  <input type="password" placeholder="New Password" className="custom-input" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                </div>
+                {error && <div className="error-banner font-body-sm mb-6" style={{ marginTop: 0 }}><span className="material-symbols-outlined">error</span>{error}</div>}
+                <button type="submit" className="action-btn" style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px' }} disabled={loading}>{loading ? 'Resetting...' : 'Reset Password'}</button>
+                <button type="button" className="ghost-btn" style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px', border: 'none', color: 'var(--primary)', marginTop: '8px' }} onClick={() => setResetStep(1)}>Back</button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (requiresOtp) {
     return (
       <div className="login-wrapper">
-        <div className="container" style={{ width: '400px', minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-          <span className="material-symbols-outlined text-primary mb-4" style={{ fontSize: '48px' }}>mark_email_unread</span>
-          <h1 className="font-headline-md text-primary mb-2">Verify Your Email</h1>
-          <p className="font-body-sm text-on-surface-variant mb-6 text-center">We've sent a 6-digit code to <strong>{otpEmail}</strong></p>
+        <div className="verify-container" style={{ width: '450px', backgroundColor: 'var(--surface-container-lowest)', borderRadius: '24px', padding: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ backgroundColor: 'var(--primary-container)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
+            <span className="material-symbols-outlined text-primary" style={{ fontSize: '40px' }}>mark_email_unread</span>
+          </div>
+          <h1 className="font-headline-lg text-primary mb-2 text-center">Verify Email</h1>
+          <p className="font-body-md text-on-surface-variant mb-8 text-center" style={{ lineHeight: '1.5' }}>
+            We've sent a 6-digit code to<br/> <strong className="text-on-surface">{otpEmail}</strong>
+          </p>
           
           <form onSubmit={handleVerifyOtp} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div className="input-group">
-              <span className="material-symbols-outlined icon">password</span>
+            <div className="input-group" style={{ marginBottom: '24px' }}>
               <input 
                 type="text" 
-                placeholder="Enter 6-digit OTP" 
+                placeholder="000000" 
                 className="custom-input text-center"
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                 maxLength="6"
                 required
-                style={{ letterSpacing: '8px', fontSize: '18px', fontWeight: 'bold' }}
+                style={{ letterSpacing: '16px', fontSize: '24px', fontWeight: 'bold', padding: '16px', borderRadius: '12px' }}
               />
             </div>
 
             {error && (
-              <div className="error-banner font-body-sm">
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>error</span>
+              <div className="error-banner font-body-sm mb-6" style={{ marginTop: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>error</span>
                 {error}
               </div>
             )}
 
-            <button type="submit" className="action-btn" style={{ width: '100%' }} disabled={loading}>
+            <button type="submit" className="action-btn" style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px', marginTop: '0' }} disabled={loading}>
               {loading ? 'Verifying...' : 'Verify Email'}
             </button>
-            <button type="button" className="ghost-btn" style={{ marginTop: '16px', color: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={() => setRequiresOtp(false)}>Back to Login</button>
+            <button type="button" className="ghost-btn" style={{ width: '100%', padding: '16px', fontSize: '16px', borderRadius: '12px', border: 'none', color: 'var(--primary)', marginTop: '8px' }} onClick={() => setRequiresOtp(false)}>Back to Login</button>
           </form>
+          
+          <div style={{ marginTop: '32px', textAlign: 'center', backgroundColor: 'var(--surface-container)', padding: '16px', borderRadius: '12px', border: '1px dashed var(--primary)', width: '100%' }}>
+            <p className="text-on-surface font-body-sm" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>terminal</span>
+              <strong>Dev Mode:</strong> Check terminal for OTP
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -284,7 +388,11 @@ const Login = ({ setAuthToken }) => {
               </div>
             )}
 
-            <button type="submit" className="action-btn" disabled={loading}>
+            <button type="button" className="font-body-sm text-primary mb-4" style={{ background: 'none', border: 'none', cursor: 'pointer', marginTop: '12px' }} onClick={() => setIsForgotPassword(true)}>
+              Forgot your password?
+            </button>
+
+            <button type="submit" className="action-btn" disabled={loading} style={{ marginTop: '0' }}>
               {loading ? 'Authenticating...' : 'Sign In'}
             </button>
             <div style={{ marginTop: '20px', width: '100%', display: 'flex', justifyContent: 'center' }}>
@@ -319,243 +427,6 @@ const Login = ({ setAuthToken }) => {
           </div>
         </div>
       </div>
-
-      <style>{`
-        .login-wrapper {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: radial-gradient(circle at top right, var(--surface-container-high), var(--background));
-          padding: 24px;
-        }
-
-        .container {
-          background-color: var(--surface-container-lowest);
-          border-radius: 20px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-          position: relative;
-          overflow: hidden;
-          width: 900px;
-          max-width: 100%;
-          min-height: 550px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .form-container {
-          position: absolute;
-          top: 0;
-          height: 100%;
-          transition: all 0.6s ease-in-out;
-        }
-
-        .form-container form {
-          background-color: var(--surface-container-lowest);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          padding: 0 50px;
-          height: 100%;
-          text-align: center;
-        }
-
-        .input-group {
-          position: relative;
-          width: 100%;
-          margin: 8px 0;
-        }
-
-        .input-group .icon {
-          position: absolute;
-          left: 16px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--on-surface-variant);
-        }
-
-        .custom-input {
-          background-color: var(--surface-container);
-          border: 1px solid var(--border-subtle);
-          padding: 14px 16px 14px 48px;
-          width: 100%;
-          border-radius: var(--radius-md);
-          color: var(--on-surface);
-          font-family: var(--font-inter);
-          outline: none;
-          transition: border-color 0.2s, background-color 0.2s;
-        }
-
-        .custom-input:focus {
-          border-color: var(--on-surface);
-          background-color: var(--surface-container-high);
-        }
-
-        .sign-in-container {
-          left: 0;
-          width: 50%;
-          z-index: 2;
-        }
-
-        .container.right-panel-active .sign-in-container {
-          transform: translateX(100%);
-        }
-
-        .sign-up-container {
-          left: 0;
-          width: 50%;
-          opacity: 0;
-          z-index: 1;
-        }
-
-        .container.right-panel-active .sign-up-container {
-          transform: translateX(100%);
-          opacity: 1;
-          z-index: 5;
-          animation: show 0.6s;
-        }
-
-        @keyframes show {
-          0%, 49.99% {
-            opacity: 0;
-            z-index: 1;
-          }
-          50%, 100% {
-            opacity: 1;
-            z-index: 5;
-          }
-        }
-
-        .overlay-container {
-          position: absolute;
-          top: 0;
-          left: 50%;
-          width: 50%;
-          height: 100%;
-          overflow: hidden;
-          transition: transform 0.6s ease-in-out;
-          z-index: 100;
-        }
-
-        .container.right-panel-active .overlay-container {
-          transform: translateX(-100%);
-        }
-
-        .overlay {
-          background: var(--primary-container);
-          background: linear-gradient(135deg, var(--inverse-surface), var(--primary-container));
-          background-repeat: no-repeat;
-          background-size: cover;
-          background-position: 0 0;
-          color: #ffffff;
-          position: relative;
-          left: -100%;
-          height: 100%;
-          width: 200%;
-          transform: translateX(0);
-          transition: transform 0.6s ease-in-out;
-        }
-
-        .container.right-panel-active .overlay {
-          transform: translateX(50%);
-        }
-
-        .overlay-panel {
-          position: absolute;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          padding: 0 40px;
-          text-align: center;
-          top: 0;
-          height: 100%;
-          width: 50%;
-          transform: translateX(0);
-          transition: transform 0.6s ease-in-out;
-        }
-
-        .overlay-left {
-          transform: translateX(-20%);
-        }
-
-        .container.right-panel-active .overlay-left {
-          transform: translateX(0);
-        }
-
-        .overlay-right {
-          right: 0;
-          transform: translateX(0);
-        }
-
-        .container.right-panel-active .overlay-right {
-          transform: translateX(20%);
-        }
-
-        .action-btn {
-          border-radius: var(--radius-full);
-          border: 1px solid var(--on-surface);
-          background-color: var(--on-surface);
-          color: var(--surface);
-          font-size: 14px;
-          font-weight: bold;
-          padding: 14px 45px;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-          transition: transform 80ms ease-in;
-          margin-top: 16px;
-        }
-
-        .action-btn:active {
-          transform: scale(0.95);
-        }
-        
-        .action-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
-
-        .ghost-btn {
-          background-color: transparent;
-          border-color: #ffffff;
-          border-radius: var(--radius-full);
-          border: 1px solid #ffffff;
-          color: #ffffff;
-          font-size: 14px;
-          font-weight: bold;
-          padding: 14px 45px;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-          transition: transform 80ms ease-in, background-color 0.2s;
-        }
-        
-        .ghost-btn:hover {
-          background-color: rgba(255,255,255,0.1);
-        }
-
-        .ghost-btn:active {
-          transform: scale(0.95);
-        }
-
-        .error-banner {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 16px;
-          background-color: rgba(239, 68, 68, 0.1);
-          color: var(--status-critical);
-          border-radius: var(--radius-sm);
-          border: 1px solid rgba(239, 68, 68, 0.2);
-          margin-top: 12px;
-          width: 100%;
-        }
-
-        .mb-2 { margin-bottom: 8px; }
-        .mb-4 { margin-bottom: 16px; }
-        .mb-6 { margin-bottom: 24px; }
-        .mb-8 { margin-bottom: 32px; }
-        .px-8 { padding-left: 32px; padding-right: 32px; }
-      `}</style>
     </div>
   );
 };

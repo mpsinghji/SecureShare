@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StatusBadge from '../components/StatusBadge';
+import { showToast } from '../utils/toast';
 
 const Dashboard = ({ authToken }) => {
   const [stats, setStats] = useState({
@@ -10,6 +11,16 @@ const Dashboard = ({ authToken }) => {
   });
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [adminUsers, setAdminUsers] = useState([]);
+
+  // Decode JWT to get user info
+  const decodeToken = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) { return null; }
+  };
+  const user = decodeToken(authToken);
+  const isAdmin = user?.email === 'admin@secureshare.com';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -29,6 +40,11 @@ const Dashboard = ({ authToken }) => {
           const activitiesData = await activitiesRes.json();
           setActivities(activitiesData);
         }
+
+        if (isAdmin) {
+          const usersRes = await fetch(`${API_URL}/api/admin/users`, { headers });
+          if (usersRes.ok) setAdminUsers(await usersRes.json());
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -37,7 +53,52 @@ const Dashboard = ({ authToken }) => {
     };
 
     fetchData();
-  }, []);
+  }, [authToken, isAdmin]);
+
+  const handleEmergencyRevoke = async () => {
+    if (!confirm('⚠️ EMERGENCY REVOKE: This will immediately revoke ALL your active documents. This cannot be undone. Continue?')) return;
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/documents/emergency-revoke`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        showToast(data.message, 'success');
+        // Refresh stats
+        const statsRes = await fetch(`${API_URL}/api/dashboard/stats`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (statsRes.ok) setStats(await statsRes.json());
+      } else {
+        showToast('Emergency revoke failed', 'error');
+      }
+    } catch (err) {
+      showToast('Network error', 'error');
+    }
+  };
+
+  const handleExportAuditLog = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/audit/export`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.download = 'secureshare-audit-log.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        showToast('Audit log exported successfully', 'success');
+      } else {
+        showToast('Failed to export audit log', 'error');
+      }
+    } catch (err) {
+      showToast('Network error', 'error');
+    }
+  };
 
   // Format timestamp helper
   const formatTimeAgo = (timestamp) => {
@@ -128,7 +189,7 @@ const Dashboard = ({ authToken }) => {
                 <span className="material-symbols-outlined text-on-surface-variant">history</span>
                 Recent Activity
               </h3>
-              <button className="text-primary font-label-caps hover-underline">View Full Audit Log</button>
+              <button className="text-primary font-label-caps hover-underline" onClick={handleExportAuditLog}>Export Audit Log</button>
             </div>
             <div className="activity-list">
               {loading && (
@@ -139,7 +200,7 @@ const Dashboard = ({ authToken }) => {
               )}
               {!loading && activities.length === 0 && <div className="p-6 text-on-surface-variant">No recent activity.</div>}
               
-              {!loading && activities.map(activity => (
+              {!loading && activities.slice(0, 5).map(activity => (
                 <div key={activity.id} className="activity-item">
                   <div className="activity-icon-wrapper" style={{ backgroundColor: activity.action_type === 'print' && activity.status === 'unauthorized' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0,0,0,0.05)' }}>
                     <span className={`material-symbols-outlined ${activity.action_type === 'print' && activity.status === 'unauthorized' ? 'text-status-critical' : 'text-primary'}`}>
@@ -186,7 +247,7 @@ const Dashboard = ({ authToken }) => {
                 <span className="font-body-md text-on-surface-variant">Admin Sessions</span>
                 <span className="text-primary font-semibold">1 Active</span>
               </div>
-              <button className="emergency-btn font-label-caps mt-2">Emergency Revoke All</button>
+              <button className="emergency-btn font-label-caps mt-2" onClick={handleEmergencyRevoke}>Emergency Revoke All</button>
             </div>
           </div>
         </div>

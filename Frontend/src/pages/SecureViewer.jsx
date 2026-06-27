@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { Document, Page, pdfjs } from 'react-pdf';
+import * as XLSX from 'xlsx';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const SecureViewer = ({ authToken, document, onClose }) => {
   const [docUrl, setDocUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Custom Render States
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [excelData, setExcelData] = useState(null);
+  
+  // Security States
+  const [isHidden, setIsHidden] = useState(false);
 
   useEffect(() => {
     if (!document) return;
@@ -18,7 +30,8 @@ const SecureViewer = ({ authToken, document, onClose }) => {
           const data = await response.json();
           setDocUrl(data.url);
         } else {
-          setError('Failed to fetch document');
+          const errData = await response.json().catch(() => ({}));
+          setError(errData.error || 'Failed to fetch document');
         }
       } catch (err) {
         console.error(err);
@@ -31,30 +44,181 @@ const SecureViewer = ({ authToken, document, onClose }) => {
     fetchDocumentUrl();
   }, [document, authToken]);
 
+  useEffect(() => {
+    if (!docUrl) return;
+    const ext = document?.name?.split('.').pop().toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      const loadExcel = async () => {
+        try {
+          const response = await fetch(docUrl);
+          const arrayBuffer = await response.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          
+          // Generate data matrix
+          const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          const cols = data.reduce((max, row) => Math.max(max, row.length), 0);
+          
+          const getColName = (n) => {
+            let s = "";
+            while(n >= 0) {
+              s = String.fromCharCode((n % 26) + 65) + s;
+              n = Math.floor(n / 26) - 1;
+            }
+            return s;
+          };
+
+          const escapeHtml = (val) => {
+            if (val === undefined || val === null) return '';
+            return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+          };
+
+          let html = '<table><thead><tr><th></th>';
+          for(let i=0; i<cols; i++) {
+            html += `<th>${getColName(i)}</th>`;
+          }
+          html += '</tr></thead><tbody>';
+          
+          data.forEach((row, rowIndex) => {
+            html += `<tr><th class="row-num">${rowIndex + 1}</th>`;
+            for(let i=0; i<cols; i++) {
+              html += `<td>${escapeHtml(row[i])}</td>`;
+            }
+            html += '</tr>';
+          });
+          html += '</tbody></table>';
+          
+          setExcelData(html);
+        } catch (err) {
+          console.error("Error parsing Excel:", err);
+          setError("Failed to load Excel securely.");
+        }
+      };
+      loadExcel();
+    }
+  }, [docUrl, document]);
+
+  // Anti-Piracy Measures
+  useEffect(() => {
+    const handleContextMenu = (e) => e.preventDefault(); // Block right-click
+    
+    const handleKeyDown = (e) => {
+      // Block F12, Ctrl+Shift+I, Ctrl+U, Ctrl+P, Ctrl+S
+      if (
+        e.keyCode === 123 || 
+        (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) || 
+        (e.ctrlKey && (e.keyCode === 85 || e.keyCode === 80 || e.keyCode === 83)) ||
+        (e.metaKey && (e.keyCode === 80 || e.keyCode === 83))
+      ) {
+        e.preventDefault();
+      }
+    };
+    
+    const handleVisibilityChange = () => setIsHidden(window.document.hidden);
+    const handleBlur = () => setIsHidden(true); // Hide when window loses focus (e.g. Snipping Tool activated)
+    const handleFocus = () => setIsHidden(false);
+
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    window.document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  const handleSecurePrint = () => {
+    // Temporarily inject a style to allow printing this specific canvas
+    const style = window.document.createElement('style');
+    style.innerHTML = '@media print { body { display: block !important; background: white; } .viewer-header, .watermark { display: none !important; } .viewer-canvas { padding: 0; } }';
+    window.document.head.appendChild(style);
+    
+    window.print();
+    
+    // Remove it immediately after
+    setTimeout(() => {
+      window.document.head.removeChild(style);
+    }, 500);
+  };
+
   if (!document) return <div className="p-8 text-on-surface">No document selected.</div>;
 
   return (
     <div className="viewer-container">
       <div className="viewer-header">
-        <h2 className="font-headline-md text-on-surface">Viewing: {document.name}</h2>
-        <button className="icon-btn" onClick={onClose}>
-          <span className="material-symbols-outlined">close</span>
-        </button>
+        <h2 className="font-headline-md text-on-surface flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary">lock</span>
+          Viewing: {document.name}
+        </h2>
+        <div className="flex gap-4">
+          {document.allow_print && (
+            <button className="secondary-btn flex items-center gap-2 font-label-caps" onClick={handleSecurePrint} title="Secure Print">
+              <span className="material-symbols-outlined" style={{fontSize: '18px'}}>print</span>
+              Print Securely
+            </button>
+          )}
+          <button className="icon-btn" onClick={onClose} title="Close">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
       </div>
       
       <div className="viewer-canvas">
-        <div className="pdf-page">
+        {isHidden && (
+          <div className="security-overlay">
+            <h3>Security Policy Enforced</h3>
+            <p>Document hidden while window is out of focus to prevent unauthorized capture.</p>
+          </div>
+        )}
+        
+        <div className={`pdf-page ${isHidden ? 'blur-content' : ''} ${document?.name?.match(/\\.(png|jpg|jpeg|mp4|mov)$/i) ? 'media-page' : ''}`}>
           <div className="watermark">CONFIDENTIAL</div>
-          {loading && <div className="content-placeholder"><p className="mt-4 font-body-lg text-on-surface-variant">Loading document...</p></div>}
+          {loading && <div className="content-placeholder"><p className="mt-4 font-body-lg text-on-surface-variant">Loading document securely...</p></div>}
           {error && <div className="content-placeholder"><p className="mt-4 font-body-lg text-status-critical">{error}</p></div>}
+          
           {!loading && !error && docUrl && (
-             <iframe 
-               src={docUrl} 
-               width="100%" 
-               height="100%" 
-               style={{ border: 'none', position: 'relative', zIndex: 1 }}
-               title={document.name}
-             />
+            <div className="secure-renderer">
+              {(() => {
+                const ext = document?.name?.split('.').pop().toLowerCase();
+                if (ext === 'pdf') {
+                  return (
+                    <div className="flex flex-col items-center">
+                      <Document
+                        file={docUrl}
+                        onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                        loading="Initializing Secure PDF Engine..."
+                      >
+                        <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} className="canvas-shadow" />
+                      </Document>
+                      {numPages > 1 && (
+                        <div className="pdf-controls mt-4 flex gap-4 items-center">
+                          <button disabled={pageNumber <= 1} onClick={() => setPageNumber(p => p - 1)} className="secondary-btn font-label-caps">Previous</button>
+                          <span className="font-code-sm">Page {pageNumber} of {numPages}</span>
+                          <button disabled={pageNumber >= numPages} onClick={() => setPageNumber(p => p + 1)} className="secondary-btn font-label-caps">Next</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                } else if (ext === 'xlsx' || ext === 'xls') {
+                  return excelData ? (
+                    <div className="excel-table-wrapper" dangerouslySetInnerHTML={{ __html: excelData }} />
+                  ) : <p>Parsing Excel securely...</p>;
+                } else if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') {
+                  return <img src={docUrl} alt="Secure Image" style={{ maxWidth: '100%', pointerEvents: 'none' }} />;
+                } else if (ext === 'mp4' || ext === 'mov') {
+                  return <video src={docUrl} controls controlsList="nodownload" onContextMenu={(e) => e.preventDefault()} style={{ maxWidth: '100%' }} />;
+                } else {
+                  return <p>Unsupported format for secure viewing. Requires native download.</p>;
+                }
+              })()}
+            </div>
           )}
         </div>
       </div>
@@ -95,17 +259,22 @@ const SecureViewer = ({ authToken, document, onClose }) => {
           justify-content: center;
           padding: 24px;
           overflow-y: auto;
+          width: 100%;
         }
         .pdf-page {
           width: 100%;
-          max-width: 800px;
-          height: 1000px;
+          max-width: 1200px;
+          min-height: 100%;
           background-color: white;
           box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
           position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+        .media-page {
+          background-color: transparent !important;
+          box-shadow: none !important;
         }
         .watermark {
           position: absolute;
@@ -124,6 +293,89 @@ const SecureViewer = ({ authToken, document, onClose }) => {
           align-items: center;
           position: absolute;
           z-index: 2;
+        }
+        
+        .security-overlay {
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.95);
+          color: white;
+          z-index: 9999;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+        }
+        
+        .blur-content {
+          filter: blur(10px);
+          opacity: 0.2;
+          pointer-events: none;
+        }
+
+        .secure-renderer {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          z-index: 1;
+        }
+        
+        .canvas-shadow canvas {
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .secondary-btn {
+          background-color: var(--surface-container-high);
+          padding: 8px 16px;
+          border-radius: var(--radius-sm);
+        }
+        .secondary-btn:disabled { opacity: 0.5; }
+        
+        .excel-table-wrapper {
+          width: 100%;
+          height: 100%;
+          overflow: auto;
+          background: white;
+          padding: 0;
+        }
+        .excel-table-wrapper table {
+          border-collapse: collapse;
+          width: 100%;
+          font-family: var(--font-body);
+          color: black;
+          font-size: 14px;
+        }
+        .excel-table-wrapper td, .excel-table-wrapper th {
+          border: 1px solid #d1d5db;
+          padding: 4px 8px;
+          text-align: left;
+          min-width: 80px;
+        }
+        .excel-table-wrapper th {
+          background-color: #f3f4f6;
+          font-weight: bold;
+          text-align: center;
+          color: #4b5563;
+        }
+        .excel-table-wrapper tr:first-child th {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+        .excel-table-wrapper th.row-num {
+          position: sticky;
+          left: 0;
+          z-index: 5;
+          width: 40px;
+          min-width: 40px;
+        }
+        .excel-table-wrapper tr:nth-child(even) {
+          background-color: #f9fafb;
+        }
+        
+        @media print {
+          body { display: none !important; }
         }
       `}</style>
     </div>

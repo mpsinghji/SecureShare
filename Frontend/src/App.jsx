@@ -7,7 +7,6 @@ import SecureUpload from './pages/SecureUpload';
 import SecureViewer from './pages/SecureViewer';
 import Login from './pages/Login';
 import './App.css';
-import './App.css';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
@@ -20,6 +19,32 @@ function App() {
     setAuthToken(null);
   };
 
+  useEffect(() => {
+    const handleAuthError = () => {
+      handleLogout();
+    };
+    window.addEventListener('auth-error', handleAuthError);
+    
+    // Global fetch interceptor to catch 401 (Unauthorized / Token Expired)
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+      const response = await originalFetch.apply(this, args);
+      if (response.status === 401) {
+        // Only trigger logout if it's an API request and not an auth request (like login/verify)
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] ? args[0].url : '');
+        if (url && url.includes('/api/') && !url.includes('/api/auth/')) {
+          window.dispatchEvent(new Event('auth-error'));
+        }
+      }
+      return response;
+    };
+
+    return () => {
+      window.removeEventListener('auth-error', handleAuthError);
+      window.fetch = originalFetch;
+    };
+  }, []);
+
   if (!authToken) {
     return (
       <ErrorBoundary>
@@ -31,7 +56,7 @@ function App() {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'dashboard': return <Dashboard authToken={authToken} />;
-      case 'documents': return <Documents authToken={authToken} onViewDocument={(doc) => { setSelectedDocument(doc); setCurrentScreen('viewer'); }} />;
+      case 'documents': return <Documents authToken={authToken} setCurrentScreen={setCurrentScreen} onViewDocument={(doc) => { setSelectedDocument(doc); setCurrentScreen('viewer'); }} />;
       case 'upload': return <SecureUpload authToken={authToken} setCurrentScreen={setCurrentScreen} />;
       case 'viewer': return <SecureViewer authToken={authToken} document={selectedDocument} onClose={() => setCurrentScreen('documents')} />;
       default: return <Dashboard authToken={authToken} />;

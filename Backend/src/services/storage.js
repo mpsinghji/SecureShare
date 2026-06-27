@@ -20,14 +20,39 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 export const uploadFile = async (fileBuffer, originalName, mimeType) => {
-  const fileName = `${Date.now()}-${originalName.replace(/\s+/g, '_')}`;
+  const fileName = `${Date.now()}-${originalName.replace(/\\s+/g, '_')}`;
   
-  const { data, error } = await supabase.storage
+  let { data, error } = await supabase.storage
     .from(bucketName)
     .upload(fileName, fileBuffer, {
       contentType: mimeType,
       upsert: false
     });
+
+  if (error && error.statusCode === '404') {
+    console.log(`Bucket '${bucketName}' not found. Attempting to create it...`);
+    const { error: createError } = await supabase.storage.createBucket(bucketName, {
+      public: true, // Make it public so getPublicUrl works
+      fileSizeLimit: 52428800 // 50MB
+    });
+
+    if (createError) {
+      console.error("Failed to create bucket:", createError);
+      throw createError;
+    }
+
+    console.log(`Bucket '${bucketName}' created successfully. Retrying upload...`);
+    // Retry the upload
+    const retry = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, fileBuffer, {
+        contentType: mimeType,
+        upsert: false
+      });
+      
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     console.error("Supabase Storage Error:", error);
@@ -43,4 +68,16 @@ export const uploadFile = async (fileBuffer, originalName, mimeType) => {
     key: fileName,
     url: publicUrlData.publicUrl
   };
+};
+
+export const deleteFile = async (fileName) => {
+  const { error } = await supabase.storage
+    .from(bucketName)
+    .remove([fileName]);
+
+  if (error) {
+    console.error('Supabase deleteFile error:', error);
+    throw error;
+  }
+  return true;
 };

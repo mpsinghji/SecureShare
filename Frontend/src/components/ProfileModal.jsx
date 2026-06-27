@@ -2,14 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { showToast } from '../utils/toast';
 
 const AVATAR_STYLES = [
-  { id: 'boy', label: 'Boy', getUrl: (name) => `https://avatar.iran.liara.run/public/boy?username=${encodeURIComponent(name)}` },
-  { id: 'girl', label: 'Girl', getUrl: (name) => `https://avatar.iran.liara.run/public/girl?username=${encodeURIComponent(name)}` },
-  { id: 'initials', label: 'Initials', getUrl: (name) => `https://avatar.iran.liara.run/username?username=${encodeURIComponent(name)}` },
-  { id: 'anonymous', label: 'Anonymous', getUrl: () => `https://lh3.googleusercontent.com/aida-public/AB6AXuCXpxJ0VJCS_a6U_-8fC-u_eoVt0m8QWjTbqOqP-AkqYzYPyP1DkBMMxqONexP9fVqZ9inW8FjhMKjSypl0l1lB7opfDPnvG6T7xSrIrcF6MtapPdpIEnujtouhUaEdHyJ4ZzS-cWEgTZWhQxW0FbNlRaoSgWUbgipgtVvH4OHI1yrc7V2W52MZhl826u3fpryTcqE7o5SjwjPsGElmFzQzyU2ayJjk-qn6cJZNLvSvVOuNqkKUp52hMx5Rou5oNl1gGX0fbOkuoI0` }
+  { id: 'adventurer', label: 'Adventurer', getUrl: (name) => `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name || 'User')}` },
+  { id: 'bottts', label: 'Bottts', getUrl: (name) => `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name || 'User')}` },
+  { id: 'lorelei', label: 'Lorelei', getUrl: (name) => `https://api.dicebear.com/7.x/lorelei/svg?seed=${encodeURIComponent(name || 'User')}` },
+  { id: 'notionists', label: 'Notion', getUrl: (name) => `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(name || 'User')}` },
+  { id: 'thumbs', label: 'Thumbs', getUrl: (name) => `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(name || 'User')}` },
+  { id: 'fun-emoji', label: 'Emoji', getUrl: (name) => `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(name || 'User')}` },
+  { id: 'initials', label: 'Initials', getUrl: (name) => `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'User')}` },
+  { id: 'anonymous', label: 'Anonymous', getUrl: () => `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%23222"><path d="M10,80 Q50,90 90,80 L85,70 L15,70 Z M25,70 L30,30 C30,10 70,10 70,30 L75,70 Z"/></svg>` }
 ];
 
 const ProfileModal = ({ authToken, isOpen, onClose, onProfileUpdate }) => {
-  const [profile, setProfile] = useState({ username: '', avatar_style: 'anonymous', email: '' });
+  const [profile, setProfile] = useState({ username: '', avatar_style: 'anonymous', email: '', newPassword: '' });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -55,7 +59,8 @@ const ProfileModal = ({ authToken, isOpen, onClose, onProfileUpdate }) => {
         },
         body: JSON.stringify({
           username: profile.username,
-          avatar_style: profile.avatar_style
+          avatar_style: profile.avatar_style,
+          newPassword: profile.newPassword
         })
       });
       
@@ -64,7 +69,8 @@ const ProfileModal = ({ authToken, isOpen, onClose, onProfileUpdate }) => {
         onProfileUpdate(); // tell parent to refresh
         onClose();
       } else {
-        showToast('Failed to update profile', 'error');
+        const data = await response.json();
+        showToast(data.error || 'Failed to update profile', 'error');
       }
     } catch (err) {
       console.error(err);
@@ -111,6 +117,20 @@ const ProfileModal = ({ authToken, isOpen, onClose, onProfileUpdate }) => {
                   placeholder="Enter your name" 
                   value={profile.username}
                   onChange={(e) => setProfile({...profile, username: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="form-group mb-4">
+              <label className="font-label-caps text-on-surface-variant mb-1 block">Change / Set Password</label>
+              <div className="input-group">
+                <span className="material-symbols-outlined icon">key</span>
+                <input 
+                  type="password" 
+                  className="custom-input" 
+                  placeholder="New password (leave blank to keep current)" 
+                  value={profile.newPassword || ''}
+                  onChange={(e) => setProfile({...profile, newPassword: e.target.value})}
                 />
               </div>
             </div>
@@ -181,7 +201,7 @@ const ProfileModal = ({ authToken, isOpen, onClose, onProfileUpdate }) => {
           height: 96px;
           border-radius: var(--radius-full);
           overflow: hidden;
-          border: 4px solid var(--primary-container);
+          border: 4px solid var(--secondary-container);
           background: var(--surface-container);
         }
         .large-avatar img {
@@ -210,13 +230,13 @@ const ProfileModal = ({ authToken, isOpen, onClose, onProfileUpdate }) => {
           transform: scale(0.95);
         }
         .avatar-option.selected {
-          background-color: var(--primary-container);
+          background-color: var(--secondary-container);
         }
         .avatar-option.selected .avatar-img-wrapper {
-          border-color: var(--primary);
+          border-color: var(--on-secondary-container);
         }
         .avatar-option.selected span {
-          color: var(--primary);
+          color: var(--on-secondary-container);
           font-weight: 600;
         }
         .avatar-img-wrapper {
@@ -232,6 +252,88 @@ const ProfileModal = ({ authToken, isOpen, onClose, onProfileUpdate }) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+        .flex { display: flex; }
+        .justify-end { justify-content: flex-end; }
+        .justify-center { justify-content: center; }
+        .gap-3 { gap: 12px; }
+        .py-8 { padding-top: 32px; padding-bottom: 32px; }
+        .mb-1 { margin-bottom: 4px; }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-4 { margin-bottom: 16px; }
+        .mb-6 { margin-bottom: 24px; }
+        .mt-2 { margin-top: 8px; }
+        .block { display: block; }
+        
+        .input-group {
+          position: relative;
+          width: 100%;
+        }
+        .input-group .icon {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--on-surface-variant);
+        }
+        .custom-input {
+          background-color: var(--surface-container);
+          border: 1px solid var(--border-subtle);
+          padding: 12px 16px 12px 40px;
+          width: 100%;
+          border-radius: var(--radius-md);
+          color: var(--on-surface);
+          font-family: var(--font-inter);
+          outline: none;
+          transition: border-color 0.2s, background-color 0.2s;
+        }
+        .custom-input:focus {
+          border-color: var(--primary);
+          background-color: var(--surface-container-high);
+        }
+        
+        .action-btn {
+          background-color: var(--primary);
+          color: var(--on-primary);
+          border: none;
+          border-radius: 9999px;
+          padding: 12px 28px !important;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: transform 0.1s, opacity 0.2s;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .action-btn:hover {
+          opacity: 0.9;
+        }
+        .action-btn:active {
+          transform: scale(0.95);
+        }
+        .action-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        
+        .ghost-btn {
+          background-color: transparent;
+          color: var(--primary);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-full);
+          padding: 10px 24px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background-color 0.2s, transform 0.1s;
+        }
+        .ghost-btn:hover {
+          background-color: var(--surface-container);
+        }
+        .ghost-btn:active {
+          transform: scale(0.95);
         }
         @keyframes fadeIn {
           from { opacity: 0; }
