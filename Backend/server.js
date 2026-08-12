@@ -33,6 +33,37 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', miscRoutes);
 
+// For manually checking the health endpoint in a browser
+app.get("/api/health", async (req, res) => {
+  try {
+    // Ping the database
+    await query('SELECT 1');
+
+    res.status(200).json({
+      status: "ok",
+      backend: "up",
+      database: "connected"
+    });
+  } catch (error) {
+    console.error("Health check error:", error.message);
+    res.status(503).json({
+      status: "error",
+      backend: "up",
+      database: "disconnected"
+    });
+  }
+});
+
+// For UptimeRobot's free HEAD monitoring
+app.head("/api/health", async (req, res) => {
+  try {
+    await query('SELECT 1');
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error("Health check failed:", error.message);
+    return res.sendStatus(503);
+  }
+});
 app.use((err, req, res, next) => {
   console.error("Unhandled Error:", err);
   res.status(500).json({ error: 'An unexpected error occurred. Please try again later.' });
