@@ -28,11 +28,6 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/documents', documentRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api', miscRoutes);
-
 // For manually checking the health endpoint in a browser
 app.get("/api/health", async (req, res) => {
   try {
@@ -64,6 +59,13 @@ app.head("/api/health", async (req, res) => {
     return res.sendStatus(503);
   }
 });
+
+app.use('/api/auth', authRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api', miscRoutes);
+
+
 app.use((err, req, res, next) => {
   console.error("Unhandled Error:", err);
   res.status(500).json({ error: 'An unexpected error occurred. Please try again later.' });
